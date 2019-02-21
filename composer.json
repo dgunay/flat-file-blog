@@ -9,5 +9,10 @@
             "email": "devingunay@gmail.com"
         }
     ],
+    "autoload": {
+        "psr-4": {
+            "BlogBackend\\" : "src/"
+        }
+    },
     "require": {}
 }
