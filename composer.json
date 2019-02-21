@@ -1,0 +1,13 @@
+{
+    "name": "dgunay/flat-file-blog",
+    "description": "A flat-file blog backend.",
+    "type": "project",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Devin Gunay",
+            "email": "devingunay@gmail.com"
+        }
+    ],
+    "require": {}
+}
