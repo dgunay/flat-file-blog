@@ -31,3 +31,11 @@ file that just defines a dependency on UPDATE_NAME 1.x:
 or 
 
 `composer require dgunay/flat-file-blog`
+
+## How It Works
+
+There are 3 elements to the system:
+
+1. A folder of unpublished posts
+2. A folder of published posts
+3. a JSON file that has the posts organized by publish time.

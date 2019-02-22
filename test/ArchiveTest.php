@@ -16,10 +16,8 @@ final class ArchiveTest extends TestCase
     $filename = tempnam(sys_get_temp_dir(), 'blogbackendunittest_');
 		file_put_contents($filename, json_encode($this->archiveFixture()));
     
-    echo file_get_contents($filename);
-
 		// Read from it
-		$this->archive = new Archive($filename);
+		$this->archive = new Archive($filename, sys_get_temp_dir());
   }
   
   public function tearDown() : void {
@@ -45,13 +43,22 @@ final class ArchiveTest extends TestCase
         "publish_date" => "1523335881"
       ],
       "1514618983" => [
-        "path" => "\/mnt\/c\/apache\/www\/html\/\/blog\/archive\/1514618983_test_post1.md",
+        "path" => "/file/thing/wow2.md",
         "title" => "title\n",
         "tags" => [
           "#post"
         ],
         "last_modified" => 1514618983,
         "publish_date" => "1514618983"
+      ],
+      "1514618960" => [
+        "path" => "/file/thing/wow3.md",
+        "title" => "title\n",
+        "tags" => [
+          "#post"
+        ],
+        "last_modified" => 1514618960,
+        "publish_date" => "1514618960"
       ]
     ];
   }
@@ -63,7 +70,9 @@ final class ArchiveTest extends TestCase
 
   public function testPostsByRange()
   {
-    $this->markTestIncomplete('testPostsByRange not written yet.');
+    // should get wow and wow2
+    $posts = $this->archive->postsByRange(1514618980, 1524618983);
+    $this->assertEquals(array_slice($this->archiveFixture(), 0, 2), $posts);
   }
 
   public function testPostsByTags()

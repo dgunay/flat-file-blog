@@ -8,18 +8,29 @@ use BlogBackend\Exception\JsonDecodeException;
 use BlogBackend\Exception\FileNotFoundException;
 
 /**
- * Retrieves all posts stored on the filesystem.
+ * Retrieves all posts stored on the filesystem, as well as serializes a JSON
+ * archive of published posts for easier access.
  */
 class Archive
 {
   /** @var string $file The file where the archive is stored */
   private $file;
 
+  /** @var string $posts_folder Where posts are stored before being published */
+  private $posts_folder;
+
+  /** @var array $archive TODO: document */
   private $archive = false;
 
-  public function __construct(string $file)
+  public function __construct(string $file, string $posts_folder)
   {
-    $this->file = $file;
+    if (!file_exists($posts_folder)) {
+      throw new FileNotFoundException("Folder {$posts_folder} doesn't exist");
+    }
+
+    $this->file         = $file;
+    $this->posts_folder = $posts_folder;
+
     $this->loadArchive($this->file);
   }
 
@@ -29,7 +40,8 @@ class Archive
   }
 
   /**
-   * Loads metadata for all posts into a 1D array sorted by timestamp.
+   * Loads metadata for all currently published posts into a 1D array sorted by 
+   * timestamp.
    *
    * @throws ArchiveJsonDecodeException if there is an error decoding the archive.
    * @return array
@@ -64,12 +76,10 @@ class Archive
       throw new \RangeException('Bounds of get_posts_by_range() invalid.');
     }
 
-    $archive = load_archive();
-
     $posts_in_range = array_filter(
-      $archive,
-      function ($val) use ($from_time, $to_time) {
-        $post_time = filemtime($val);
+      $this->archive,
+      function (Post $post) use ($from_time, $to_time) {
+        $post_time = $post->lastModified();
         return $post_time >= $from_time && $post_time <= $to_time;
       }
     );
@@ -80,7 +90,7 @@ class Archive
   public function postsByTags(array $tags)
   {
     if (empty($tags)) {
-      throw new Exception('Array of tags must not be empty.');
+      throw new \InvalidArgumentException('Array of tags must not be empty.');
     }
 
     // prepend # to tags if not already present.
@@ -90,10 +100,8 @@ class Archive
       }
     });
 
-    $archive = load_archive();
-
     $posts_with_matching_tags = array();
-    foreach ($archive as $timestamp => $post_data) {
+    foreach ($this->archive as $timestamp => $post_data) {
       if (!empty(array_intersect($tags, $post_data['tags']))) {
         $posts_with_matching_tags[$timestamp] = $post_data;
       }
@@ -142,9 +150,9 @@ class Archive
 
     return array(
       'path'          => $path,
-      'title'          => $title,
+      'title'         => $title,
       'tags'          => $tags,
-      'last_modified'  => filemtime($path),
+      'last_modified' => filemtime($path),
       'publish_date'  => $publish_date,
     );
   }
@@ -160,12 +168,12 @@ class Archive
    * Collects the paths to all .md files in ./posts into an associative array
    * with posts filed away by year and month. 
    */
-  function get_archive_by_year()
+  function getArchiveByYear()
   {
     throw new NotImplementedException("TODO: implement");
-    $archive = array();
-    $timestamp_archive = load_archive();
-    foreach ($timestamp_archive as $publish_time => $post) {
+
+    $archive_by_year = [];
+    foreach ($this->archive as $publish_time => $post) {
       // construct datetime from Unix timestamp
       $post_datetime = DateTime::createFromFormat(
         'U', // unix timestamp
@@ -174,17 +182,17 @@ class Archive
       );
 
       // use year and month to sort posts into data structure ($archive)
-      $year = $post_datetime->format('Y');
+      $year  = $post_datetime->format('Y');
       $month = $post_datetime->format('m');
 
-      $archive[$year][$month][] = $post;
+      $archive_by_year[$year][$month][] = $post;
     }
 
     // sort years descending
-    arsort($archive);
+    arsort($archive_by_year);
 
     // sort months
-    foreach ($archive as $year => &$months) {
+    foreach ($archive_by_year as $year => &$months) {
       uksort($months, function ($a, $b) {
         $month_a = date_parse($a)['month'];
         $month_b = date_parse($b)['month'];
@@ -193,7 +201,7 @@ class Archive
       });
     }
 
-    return $archive;
+    return $archive_by_year;
   }
 
   /**
@@ -350,7 +358,7 @@ class Archive
   function update_archive()
   {
     throw new NotImplementedException();
-    
+
     $archive = get_archive();
 
     $posts = glob($GLOBALS['blog_root'] . '/archive/*.md');
