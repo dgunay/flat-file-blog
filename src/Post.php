@@ -4,7 +4,6 @@ namespace BlogBackend;
 
 use BlogBackend\Exception\NotImplementedException;
 
-
 /**
  * Represents a post.
  */

@@ -1,21 +1,22 @@
 {
-    "name": "dgunay/flat-file-blog",
-    "description": "A flat-file blog backend.",
-    "type": "project",
-    "license": "MIT",
-    "authors": [
-        {
-            "name": "Devin Gunay",
-            "email": "devingunay@gmail.com"
-        }
-    ],
-    "autoload": {
-        "psr-4": {
-            "BlogBackend\\" : "src/"
-        }
-    },
-    "require": {},
-    "require-dev": {
-        "phpunit/phpunit": "^8.0"
+  "name": "dgunay/flat-file-blog",
+  "description": "A flat-file blog backend.",
+  "type": "project",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Devin Gunay",
+      "email": "devingunay@gmail.com"
     }
+  ],
+  "autoload": {
+    "psr-4": {
+      "BlogBackend\\": "src/",
+      "BlogBackend\\Test\\": "test/"
+    }
+  },
+  "require": {},
+  "require-dev": {
+    "phpunit/phpunit": "^8.0"
+  }
 }
