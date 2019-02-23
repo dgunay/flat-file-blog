@@ -10,52 +10,47 @@ use BlogBackend\Exception\NotImplementedException;
 class Post
 {
   /** @var string $path File path */
-  protected $path;  
+  protected $path;
 
   /** @var string $title */
-  protected $title; 
+  protected $title;
 
   /** @var array $tags */
-  protected $tags;  
+  protected $tags;
 
   /** @var string $last_modified unix timestamp */
-  protected $last_modified; 
+  protected $last_modified;
 
-  /** @var string $publish_date unix timestamp */
-  protected $publish_date; 
+  /** @var string $publish_time unix timestamp */
+  protected $publish_time;
 
   /** TODO: overload to be either an array or a filename constructor */
   // or use an interface?
-  public function __construct(string $file_name)
-  {
+  public function __construct(
+    string $path,
+    string $title,
+    array  $tags,
+    string $publish_time
+  ) {
     // TODO: validation
-    $this->path          = $file_name;
-    $this->title         = $this->parseTitle();
-    $this->tags          = $this->parseTags();
-    $this->last_modified = filemtime($file_name);
-    $this->publish_date  = parsePublishDate();
+    $this->path          = $path;
+    $this->title         = $title;
+    $this->tags          = $tags;
+    $this->last_modified = filemtime($path);
+    $this->publish_time  = $publish_time;
   }
 
-  // parse title from first # 
-  protected function parseTitle() : string {
-    throw new NotImplementedException();
+  public function markdown(): string
+  {
+    throw new NotImplementedException(
+      "TODO: chop off the header and return the markdown"
+    );
     return '';
   }
-  // parse tags from first comment
-  protected function parseTags() : array {
-    throw new NotImplementedException();
-    return [];
-  }
-  // parse from filename
-  protected function parsePublishDate() : string {
-    throw new NotImplementedException();
-    return '';
-  }
-  
-  public function getPath()        : string { return $this->path;          }
-  public function getTitle()       : string { return $this->title;         }
-  public function getTags()        : array  { return $this->tags;          }
-  public function LastModified()   : string { return $this->last_modified; }
-  public function getPublishDate() : string { return $this->publish_date;  }
-}
+
+  public function getPath()         : string { return $this->path;          }
+  public function getTitle()        : string { return $this->title;         }
+  public function getTags()         : array  { return $this->tags;          }
+  public function getLastModified() : string { return $this->last_modified; }
+  public function getPublishTime()  : string { return $this->publish_time;  }
 
