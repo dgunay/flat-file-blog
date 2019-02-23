@@ -6,6 +6,23 @@ use PHPUnit\Framework\TestCase;
 
 final class PostFactoryTest extends TestCase
 {
-  // TODO: write tests
-}
+  public function setUp()
+  {
+    $this->markTestIncomplete();
+  }
 
+  public function tearDown()
+  {
+    $this->markTestIncomplete();
+  }
+
+  public function testConstructPostFromFile()
+  {
+    $this->markTestIncomplete(); 
+  }
+
+  public function testConstructPostFromParams()
+  {
+    $this->markTestIncomplete();
+  }
+}
