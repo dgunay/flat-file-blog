@@ -2,4 +2,4 @@
 
 namespace BlogBackend\Exception;
 
-class FileNotFoundException extends ArchiveException { }
+class FileNotFoundException extends \Exception { }

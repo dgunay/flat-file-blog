@@ -202,8 +202,42 @@ final class ArchiveTest extends TestCase
     $this->assertEquals($expected, $actual);
   }
 
-  public function testGetArchiveByYear()
-  {
-    $this->markTestIncomplete('testGetArchiveByYear not written yet.');
+  public function testGetPostsFrom()
+  {    
+    // Map expected to Posts
+    $archive = $this->mapYmdArchiveFixtureToPosts();
+
+    $this->archive->loadYmdArchive();
+
+    // Get everything from 2017
+    $expected = $archive['2017'];
+    $this->assertEquals($expected, $this->archive->getPostsFrom(2017), 'Posts from 2017');
+    
+    // Get posts from 4/10/2018
+    $expected = $archive['2018']['10']['4'];
+    $this->assertEquals(
+      $expected, 
+      $this->archive->getPostsFrom(2017, 10, 4), 
+      'Posts on 10/4/2018'
+    );
+
+    // Cache miss
+    $this->expectException(\OutOfBoundsException::class);
+    $this->archive->getPostsFrom(2019);
+  }
+
+  private function mapYmdArchiveFixtureToPosts() : array {
+    $archive = $this->ymdArchiveFixture();
+    foreach ($archive as $year => $months) {
+      foreach ($months as $month => $days) {
+        foreach ($days as $day => $posts) {
+          foreach ($posts as $index => $post_params) {
+            $archive[$year][$month][$day][$index] = PostFactory::fromParams($post_params);
+          }
+        }
+      }
+    }
+
+    return $archive;
   }
 }

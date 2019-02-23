@@ -260,7 +260,8 @@ class Archive
     return PostFactory::fromFilename($destination);
   }
 
-  public function loadYmdArchive() : void {
+  public function loadYmdArchive(): void
+  {
     $file_contents = @file_get_contents($this->ymd_archive_file);
     if ($file_contents === false) {
       throw new FileNotFoundException(
@@ -330,5 +331,53 @@ class Archive
     }
 
     $this->ymd_archive = $archive_by_year;
+  }
+
+  /**
+   * Gets posts from a given year/month/day. Month and day are optional. The
+   * resulting array is not flattened so you will have to do that yourself if
+   * you are retrieving by year/month and not day.
+   *
+   * @throws \OutOfBoundsException if there are no posts in the year/month/day.
+   * @param string|int $year
+   * @param string|int $month
+   * @param string|int $day
+   * @return Post[]
+   */
+  public function getPostsFrom($year, $month = null, $day = null): array
+  {
+    if ($this->ymd_archive === null) {
+      throw new \RuntimeException(
+        "Y/M/D archive not loaded. Call loadYmdArchive() first."
+      );
+    }
+
+    if (array_key_exists($year, $this->ymd_archive)) {
+      $the_year = $this->ymd_archive[$year];
+
+      if ($month !== null) {
+        if (array_key_exists($month, $the_year)) {
+          $the_month = $the_year[$month];
+
+          if ($day !== null) {
+            if (array_key_exists($day, $the_month)) {
+              return $the_month[$day];
+            } else {
+              throw new \OutOfBoundsException(
+                "No posts published on {$year}/{$month}/{$day}"
+              );
+            }
+          }
+
+          return $the_month;
+        } else {
+          throw new \OutOfBoundsException("No posts published in {$year}/{$month}");
+        }
+      }
+
+      return $the_year;
+    } else {
+      throw new \OutOfBoundsException("No posts published in {$year}");
+    }
   }
 }
