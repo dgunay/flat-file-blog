@@ -6,6 +6,7 @@ use BlogBackend\Post;
 use BlogBackend\Exception\NotImplementedException;
 use BlogBackend\Exception\JsonDecodeException;
 use BlogBackend\Exception\FileNotFoundException;
+use BlogBackend\Exception\InvalidFileNameException;
 
 /**
  * Retrieves all posts stored on the filesystem, as well as serializes a JSON
@@ -13,44 +14,91 @@ use BlogBackend\Exception\FileNotFoundException;
  */
 class Archive
 {
-  /** @var string $file The file where the archive is stored */
-  private $file;
+  /** @var string? $file The file where the archive is stored flatly */
+  private $flat_archive_file;
+
+  /** @var string? $file The file where the archive is stored by year/month/day */
+  private $ymd_archive_file;
 
   /** @var string $posts_folder Where posts are stored before being published */
   private $posts_folder;
 
-  /** @var array $archive TODO: document */
+  /** @var string $published_folder Where published posts are stored */
+  private $published_folder;
+
+  /** @var array $archive Posts in a 1d array sorted by publish time */
   private $archive = false;
 
-  public function __construct(string $file, string $posts_folder)
-  {
+  /** @var array $ymd_archive Posts in a 3d array organized by year/month/day */
+  private $ymd_archive = false;
+
+  // TODO: document once the API has settled
+  public function __construct(
+    string $posts_folder,
+    string $published_folder,
+    string $flat_archive_file = null,
+    string $ymd_archive_file  = null
+  ) {
+    // See if the folders exist
     if (!file_exists($posts_folder)) {
-      throw new FileNotFoundException("Folder {$posts_folder} doesn't exist");
+      throw new FileNotFoundException(
+        "Folder {$posts_folder} for unpublished posts doesn't exist"
+      );
     }
 
-    $this->file         = $file;
-    $this->posts_folder = $posts_folder;
+    if (!file_exists($published_folder)) {
+      throw new FileNotFoundException(
+        "Folder {$published_folder} for publishing posts doesn't exist"
+      );
+    }
 
-    $this->loadArchive($this->file);
+    // These are nullable and will just cause exceptions later if the user 
+    // hasn't set them
+    $this->flat_archive_file = $flat_archive_file;
+    $this->ymd_archive_file  = $ymd_archive_file;
+
+    $this->posts_folder      = $posts_folder;
+    $this->published_folder  = $published_folder;
   }
 
-  public function getFileName(): string
+  /**
+   * Gets the filename where the archive is or will be stored as a 1D JSON map. 
+   *
+   * @return string
+   */
+  public function getFlatArchiveFilename(): string
   {
-    return $this->file;
+    return $this->flat_archive_file;
+  }
+
+  /**
+   * Gets the filename where the archive is or will be stored as a nested JSON 
+   * map by year/month/day.
+   *
+   * @return string
+   */
+  public function getYmdArchiveFilename(): string
+  {
+    return $this->ymd_archive_file;
   }
 
   /**
    * Loads metadata for all currently published posts into a 1D array sorted by 
    * timestamp.
+   * 
+   * If the file doesn't exist, throws an exception.
    *
    * @throws ArchiveJsonDecodeException if there is an error decoding the archive.
-   * @return array
+   * @throws FileNotFound               if the archive file doesn't exist
+   * @return void
    */
-  private function loadArchive(): void
+  public function loadFlatArchive(): void
   {
-    $file_contents = @file_get_contents($this->file);
+    $file_contents = @file_get_contents($this->flat_archive_file);
     if ($file_contents === false) {
-      throw new FileNotFoundException("File {$this->file} not found.");
+      throw new FileNotFoundException(
+        "File {$this->flat_archive_file} not found. Make sure to generate it first."
+      );
     }
 
     $archive = json_decode($file_contents, true);
@@ -60,6 +108,32 @@ class Archive
     }
 
     $this->archive = $archive;
+  }
+
+
+  public function generateFlatArchive(): void
+  {
+    $post_files = glob($this->posts_folder . '/*.md');
+
+    $archive = [];
+    foreach ($post_files as $post_file) {
+      preg_match('/^\d+/', basename($post_file), $match);
+      if (isset($match[0])) {
+        $publish_date = $match[0];
+        $archive[$publish_date] = new Post($post_file);
+      } else {
+        throw new InvalidFileNameException(
+          "Failed to regex publish date from filename {$post_file}"
+        );
+      }
+    }
+
+    krsort($archive, SORT_NUMERIC);
+
+    file_put_contents(
+      $GLOBALS['blog_root'] . '/archive.json',
+      json_encode($archive)
+    );
   }
 
   /**
@@ -157,7 +231,7 @@ class Archive
     );
   }
 
-  public function publishPost(Post $post, int $time = null): void
+  public function publish(Post $post, int $time = null): void
   {
     throw new NotImplementedException("TODO: implement publishPost");
     $destination = $GLOBALS['blog_root'] . '/archive/' . $time . '_' . basename($path_to_post);
@@ -205,10 +279,10 @@ class Archive
   }
 
   /**
- * TODO: document and finish
- *
- * @return void
- */
+   * TODO: document and finish
+   *
+   * @return void
+   */
   function generate_archive_by_folder()
   {
     throw new NotImplementedException();
@@ -321,6 +395,7 @@ class Archive
     );
   }
 
+  // TODO: generates archive from the flat folder
   function generate_archive(string $folder = null)
   {
     throw new NotImplementedException();
