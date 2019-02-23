@@ -49,24 +49,23 @@ There are 3 elements to the system:
 
 1. A folder of unpublished posts
 2. A folder of published posts
-3. a JSON file that has the posts organized by publish time.
+3. a JSON file that has the published posts organized by publish time.
 
 When you write a post, it looks something like:
 
-```yaml
----
+```
+<!--
 author: 
 tags: [ '#BigChungus', '#memes' ]
----
+-->
 
 # Title of My Blog Post
 
 Lorem ipsum...
 ```
 
-Metadata is in a YAML header bounded by `---`, similar to Jekyll or Sculpin. 
-You may either define a `title` in the header or it will parse the first `#`
-header of your post.
+Metadata is in a YAML header bounded by an HTML comment. You may either define 
+a `title` in the header or it will parse the first `#` header of your post.
 
 You place your unpublished posts in a folder.
 
