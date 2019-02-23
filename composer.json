@@ -15,7 +15,9 @@
       "BlogBackend\\Test\\": "test/"
     }
   },
-  "require": {},
+  "require": {
+    "symfony/yaml": "^4.2"
+  },
   "require-dev": {
     "phpunit/phpunit": "^8.0",
     "mikey179/vfsStream": "v1.6.5"

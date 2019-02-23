@@ -177,13 +177,29 @@ final class ArchiveTest extends TestCase
       file_get_contents(__DIR__ . '/Fixtures/my_new_post.md')
     );
 
-    // Construct a Post object from it
-    $post = PostFactory::fromFilename(vfsStream::url('home/unpublished/my_new_post.md'));
+    // Publish it
+    $post = $this->archive->publish(
+      vfsStream::url('home/unpublished/my_new_post.md'), 
+      100
+    );
 
-    $this->archive->publish($post, 100);
-
-    // Did it work?
+    // Did it get published?
     $this->assertTrue(file_exists(vfsStream::url('home/published/100_my_new_post.md')));
+
+    // Are the post details correct?
+    $expected = [
+      "fileName" => vfsStream::url("home/published/100_my_new_post.md"),
+      'title' => "My New Post",
+      'tags' => ['#wow'],
+      "publishTime" => 100,
+    ];
+    $actual = [
+      "fileName" => $post->getFileName(),
+      'title' => $post->getTitle(),
+      'tags' => $post->getTags(),
+      "publishTime" => $post->getPublishTime(),
+    ];
+    $this->assertEquals($expected, $actual);
   }
 
   public function testGetArchiveByYear()

@@ -3,7 +3,9 @@
 namespace BlogBackend;
 
 use BlogBackend\Post;
-use BlogBackend\Exception\NotImplementedException;
+use BlogBackend\Exception\InvalidFileNameException;
+
+use Symfony\Component\Yaml\Yaml;
 
 /**
  * Provides methods to handle constructing Post objects easily.
@@ -68,8 +70,47 @@ class PostFactory
   }
 
   protected static function parseHeader(string $filename) : array
-  { 
-    throw new NotImplementedException("TODO: implement parseHeader");
-    return [];
+  {     
+    if ( ($fp_in = fopen($filename, 'r')) === false) {
+      throw new \RuntimeException("Failed to open {$filename} for reading.");
+    }
+
+    // First line is a comment <!--
+    while ($line = fgets($fp_in)) {
+      if (preg_match('/<!--/', $line)) {
+        break;
+      }
+    }
+
+    // Now read the YAML
+    $yaml = '';
+    while ($line = fgets($fp_in)) {
+      // end as soon as -->
+      if (preg_match('/-->/', $line)) {
+        break;
+      }
+      else {
+        $yaml .= $line;
+      }
+    }
+    
+    $header = Yaml::parse($yaml);
+
+    // Get the title from the first H1 (#) if it's not already in the header.
+    if (!array_key_exists('title', $header)) {
+      while ($line = fgets($fp_in)) {
+        if (preg_match('/#(.+)/', $line, $match)) {
+          $header['title'] = trim($match[1]);
+          fclose($fp_in);
+          return $header;
+        }
+      }
+
+      throw new \RuntimeException(
+        "Unable to parse title: reached end of file {$filename}"
+      );
+    }
+
+    return $header;
   }
 }
