@@ -7,6 +7,7 @@ use BlogBackend\Exception\NotImplementedException;
 use BlogBackend\Exception\JsonDecodeException;
 use BlogBackend\Exception\FileNotFoundException;
 use BlogBackend\Exception\InvalidFileNameException;
+use BlogBackend\Exception\ArchiveException;
 
 /**
  * Retrieves all posts stored on the filesystem, as well as serializes a JSON
@@ -26,11 +27,11 @@ class Archive
   /** @var string $published_folder Where published posts are stored */
   private $published_folder;
 
-  /** @var array $archive Posts in a 1d array sorted by publish time */
-  private $archive = false;
+  /** @var array? $flat_archive Posts in a 1d array sorted by publish time */
+  private $flat_archive = null;
 
-  /** @var array $ymd_archive Posts in a 3d array organized by year/month/day */
-  private $ymd_archive = false;
+  /** @var array? $ymd_archive Posts in a 3d array organized by year/month/day */
+  private $ymd_archive = null;
 
   // TODO: document once the API has settled
   public function __construct(
@@ -103,17 +104,20 @@ class Archive
 
     $archive = json_decode($file_contents, true);
 
+    foreach ($archive as $publish_time => $params) {
+      $archive[$publish_time] = PostFactory::fromParams($params);
+    }
+
     if (json_last_error() !== JSON_ERROR_NONE) {
       throw new JsonDecodeException(json_last_error_msg());
     }
 
-    $this->archive = $archive;
+    $this->flat_archive = $archive;
   }
-
 
   public function generateFlatArchive(): void
   {
-    $post_files = glob($this->posts_folder . '/*.md');
+    $post_files = glob($this->published_folder . '/*.md');
 
     $archive = [];
     foreach ($post_files as $post_file) {
@@ -146,15 +150,21 @@ class Archive
    */
   public function postsByRange(int $from_time, int $to_time): array
   {
+    if ($this->flat_archive === null) {
+      throw new \RuntimeException(
+        "Flat archive not loaded. Call loadFlatArchive() first."
+      );
+    }
+
     if ($from_time > $to_time) {
       throw new \RangeException('Bounds of get_posts_by_range() invalid.');
     }
 
     $posts_in_range = array_filter(
-      $this->archive,
+      $this->flat_archive,
       function (Post $post) use ($from_time, $to_time) {
-        $post_time = $post->lastModified();
-        return $post_time >= $from_time && $post_time <= $to_time;
+        $post_time = $post->getPublishTime();
+        return ( $post_time >= $from_time && $post_time <= $to_time );
       }
     );
 
@@ -175,9 +185,9 @@ class Archive
     });
 
     $posts_with_matching_tags = array();
-    foreach ($this->archive as $timestamp => $post_data) {
-      if (!empty(array_intersect($tags, $post_data['tags']))) {
-        $posts_with_matching_tags[$timestamp] = $post_data;
+    foreach ($this->flat_archive as $timestamp => $post) {
+      if (!empty(array_intersect($tags, $post->getTags()))) {
+        $posts_with_matching_tags[$timestamp] = $post;
       }
     }
 
@@ -233,9 +243,19 @@ class Archive
 
   public function publish(Post $post, int $time = null): void
   {
-    throw new NotImplementedException("TODO: implement publishPost");
-    $destination = $GLOBALS['blog_root'] . '/archive/' . $time . '_' . basename($path_to_post);
-    copy($path_to_post, $destination);
+    $time = $time ?? time();
+    $post_basename = basename($post->getFileName());
+    $destination = "{$this->published_folder}/{$time}_{$post_basename}";
+
+    // Really shouldn't happen, but is technically possible.
+    if (file_exists($destination)) {
+      throw new ArchiveException("Published post already exists at $destination");
+    }
+
+    // Attempt the copy and throw an exception if it fails
+    if (!@copy($post->getFileName(), $destination)) {
+      throw new \RuntimeException(error_get_last());
+    }
   }
 
   /**

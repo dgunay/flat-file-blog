@@ -6,9 +6,9 @@ use BlogBackend\Post;
 use BlogBackend\Exception\NotImplementedException;
 
 /**
- * Provides static methods to handle constructing Post objects easily.
+ * Provides methods to handle constructing Post objects easily.
  */
-abstract class PostFactory
+class PostFactory
 {
   /**
    * Parses the file for its attributes (like title, tags, etc) and then makes a
@@ -20,13 +20,13 @@ abstract class PostFactory
   public static function fromFilename(string $filename): Post
   {
     // Parse out the attributes then send them to the constructor
-    $params = $this->parseHeader($filename);
+    $params = PostFactory::parseHeader($filename);
 
     return new Post(
       $filename,
       $params['title'],
       $params['tags'],
-      $this->parsePublishTime($filename)
+      PostFactory::parsePublishTime($filename)
     );
   }
 
@@ -47,19 +47,19 @@ abstract class PostFactory
   }
 
   /**
-   * Undocumented function
+   * TODO: Undocumented function
    * 
    * @throws InvalidFileNameException if the filename doesn't start with a unix 
    *                                  timestamp
    * @param string $filename
-   * @return string
+   * @return int
    */
-  protected static function parsePublishTime(string $filename): string
+  protected static function parsePublishTime(string $filename): int
   {
     preg_match('/^\d+/', basename($filename), $match);
     if (isset($match[0])) {
       $publish_date = $match[0];
-      return $publish_date;
+      return (int) $publish_date;
     } 
 
     throw new InvalidFileNameException(

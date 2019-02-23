@@ -9,8 +9,8 @@ use BlogBackend\Exception\NotImplementedException;
  */
 class Post
 {
-  /** @var string $path File path */
-  protected $path;
+  /** @var string $fileName Path to the file */
+  protected $fileName;
 
   /** @var string $title */
   protected $title;
@@ -18,26 +18,29 @@ class Post
   /** @var array $tags */
   protected $tags;
 
-  /** @var string $last_modified unix timestamp */
-  protected $last_modified;
+  /** @var int $lastModified unix timestamp */
+  protected $lastModified;
 
-  /** @var string $publish_time unix timestamp */
-  protected $publish_time;
+  /** @var int $publishTime unix timestamp */
+  protected $publishTime;
 
-  /** TODO: overload to be either an array or a filename constructor */
-  // or use an interface?
+  /** @var string|null $author */
+  protected $author = null;
+
   public function __construct(
-    string $path,
+    string $fileName,
     string $title,
     array  $tags,
-    string $publish_time
+    int    $publishTime,
+    string $author = null
   ) {
     // TODO: validation
-    $this->path          = $path;
+    $this->fileName      = $fileName;
     $this->title         = $title;
     $this->tags          = $tags;
-    $this->last_modified = filemtime($path);
-    $this->publish_time  = $publish_time;
+    $this->lastModified  = filemtime($fileName);
+    $this->publishTime   = $publishTime;
+    $this->author        = $author;
   }
 
   public function markdown(): string
@@ -48,9 +51,10 @@ class Post
     return '';
   }
 
-  public function getPath()         : string { return $this->path;          }
-  public function getTitle()        : string { return $this->title;         }
-  public function getTags()         : array  { return $this->tags;          }
-  public function getLastModified() : string { return $this->last_modified; }
-  public function getPublishTime()  : string { return $this->publish_time;  }
-
+  public function getFileName()     : string  { return $this->fileName;      }
+  public function getTitle()        : string  { return $this->title;         }
+  public function getTags()         : array   { return $this->tags;          }
+  public function getLastModified() : int     { return $this->lastModified;  }
+  public function getPublishTime()  : int     { return $this->publishTime;   }
+  public function getAuthor()       : ?string { return $this->author;        }
+}
