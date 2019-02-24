@@ -20,11 +20,10 @@ final class ArchiveTest extends TestCase
     // set up the root of our virtual filesystem with two folders
     $this->root  = vfsStream::setUp('home');
     $published   = vfsStream::newDirectory('published')->at($this->root);
-    $unpublished = vfsStream::newDirectory('unpublished')->at($this->root);
 
     // Copy our posts into them
     vfsStream::copyFromFileSystem(
-      __DIR__ .'/Fixtures/virtual/published',
+      __DIR__ . '/Fixtures/virtual/published',
       $published
     );
 
@@ -45,7 +44,6 @@ final class ArchiveTest extends TestCase
 
     // Give these virtual folders/files to the Archive
     $this->archive = new Archive(
-      vfsStream::url('home/unpublished'),
       vfsStream::url('home/published'),
       vfsStream::url('home/flat_archive.json'),
       vfsStream::url('home/ymd_archive.json')
@@ -58,14 +56,14 @@ final class ArchiveTest extends TestCase
       "1514618960" => [
         "fileName" => vfsStream::url("home/published/1514618960_wow3.md"),
         "title" => "title",
-        "tags" => [ "#post" ],
+        "tags" => ["#post"],
         // "last_modified" => 1514618960,
         "publishTime" => 1514618960
       ],
       "1514618983" => [
         "fileName" => vfsStream::url("home/published/1514618983_wow2.md"),
         "title" => "title",
-        "tags" => [ "#post" ],
+        "tags" => ["#post"],
         // "last_modified" => 1514618983,
         "publishTime" => 1514618983
       ],
@@ -102,14 +100,14 @@ final class ArchiveTest extends TestCase
             [
               "fileName" => vfsStream::url("home/published/1514618983_wow2.md"),
               "title" => "title",
-              "tags" => [ "#post" ],
+              "tags" => ["#post"],
               // "last_modified" => 1514618983,
               "publishTime" => 1514618983
             ],
             [
               "fileName" => vfsStream::url("home/published/1514618960_wow3.md"),
               "title" => "title",
-              "tags" => [ "#post" ],
+              "tags" => ["#post"],
               // "last_modified" => 1514618960,
               "publishTime" => 1514618960
             ]
@@ -120,11 +118,11 @@ final class ArchiveTest extends TestCase
   }
 
   public function testPostsByRange()
-  {    
+  {
     // Load the archive in memory
     $this->archive->loadFlatArchive();
-    
-    $expected = array_map(function(array $params) {
+
+    $expected = array_map(function (array $params) {
       return PostFactory::fromParams($params);
     }, array_slice($this->flatArchiveFixture(), 0, 2, true));
 
@@ -142,16 +140,17 @@ final class ArchiveTest extends TestCase
 
     // We have to map the array to Post here because dataProviders run before 
     // setUp().
-    $expected = array_map(function(array $params) {
+    $expected = array_map(function (array $params) {
       return PostFactory::fromParams($params);
     }, $expected);
-    
+
     $posts = $this->archive->postsByTags($tags);
 
     $this->assertEquals($expected, $posts);
   }
 
-  public function tagsProvider() {
+  public function tagsProvider()
+  {
     $archive = $this->flatArchiveFixture();
     return [
       'Normal tags' => [
@@ -179,7 +178,7 @@ final class ArchiveTest extends TestCase
 
     // Publish it
     $post = $this->archive->publish(
-      vfsStream::url('home/unpublished/my_new_post.md'), 
+      vfsStream::url('home/unpublished/my_new_post.md'),
       100
     );
 
@@ -203,7 +202,7 @@ final class ArchiveTest extends TestCase
   }
 
   public function testGetPostsFrom()
-  {    
+  {
     // Map expected to Posts
     $archive = $this->mapYmdArchiveFixtureToPosts();
 
@@ -212,16 +211,16 @@ final class ArchiveTest extends TestCase
     // Get everything from 2017
     $expected = $archive['2017'];
     $this->assertEquals(
-      $expected, 
-      $this->archive->getPostsFrom(2017), 
+      $expected,
+      $this->archive->getPostsFrom(2017),
       'Posts from 2017'
     );
-    
+
     // Get posts from 4/10/2018
     $expected = $archive['2018']['4']['10'];
     $this->assertEquals(
-      $expected, 
-      $this->archive->getPostsFrom(2018, 4, 10), 
+      $expected,
+      $this->archive->getPostsFrom(2018, 4, 10),
       'Posts on 10/4/2018'
     );
 
@@ -230,7 +229,8 @@ final class ArchiveTest extends TestCase
     $this->archive->getPostsFrom(2019);
   }
 
-  private function mapYmdArchiveFixtureToPosts() : array {
+  private function mapYmdArchiveFixtureToPosts(): array
+  {
     $archive = $this->ymdArchiveFixture();
     foreach ($archive as $year => $months) {
       foreach ($months as $month => $days) {

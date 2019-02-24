@@ -21,9 +21,6 @@ class Archive
   /** @var string? $file The file where the archive is stored by year/month/day */
   private $ymd_archive_file;
 
-  /** @var string $posts_folder Where posts are stored before being published */
-  private $posts_folder;
-
   /** @var string $published_folder Where published posts are stored */
   private $published_folder;
 
@@ -35,31 +32,23 @@ class Archive
 
   // TODO: document once the API has settled
   public function __construct(
-    string $posts_folder,
     string $published_folder,
     string $flat_archive_file = null,
     string $ymd_archive_file  = null
   ) {
-    // See if the folders exist
-    if (!file_exists($posts_folder)) {
-      throw new FileNotFoundException(
-        "Folder {$posts_folder} for unpublished posts doesn't exist"
-      );
-    }
-
+    // See if the folder exists
     if (!file_exists($published_folder)) {
       throw new FileNotFoundException(
         "Folder {$published_folder} for publishing posts doesn't exist"
       );
     }
 
+    $this->published_folder  = $published_folder;
+
     // These are nullable and will just cause exceptions later if the user 
     // hasn't set them
     $this->flat_archive_file = $flat_archive_file;
     $this->ymd_archive_file  = $ymd_archive_file;
-
-    $this->posts_folder      = $posts_folder;
-    $this->published_folder  = $published_folder;
   }
 
   /**
@@ -241,6 +230,16 @@ class Archive
     );
   }
 
+  /**
+   * TODO: Undocumented function
+   *
+   * @throws ArchiveException if the post already exists
+   * @throws \RuntimeException if it fails to copy the post to its published location.
+   * @param string $post_file Unpublished post markdown file.
+   * @param integer $time If set, sets the publish time to this unix timestamp. 
+   *                      Otherwise it defaults to time().
+   * @return Post
+   */
   public function publish(string $post_file, int $time = null): Post
   {
     $time = $time ?? time();
@@ -257,7 +256,13 @@ class Archive
       throw new \RuntimeException(error_get_last());
     }
 
-    return PostFactory::fromFilename($destination);
+    try {
+      return PostFactory::fromFilename($destination);
+    } catch (\Exception $e) {
+      // Clean up the copied file before rethrowing
+      unlink($destination);
+      throw $e;
+    }
   }
 
   public function loadYmdArchive(): void
@@ -274,6 +279,7 @@ class Archive
       throw new JsonDecodeException(json_last_error_msg());
     }
 
+    // Map the posts into Post objects
     foreach ($archive as $year => $months) {
       foreach ($months as $month => $days) {
         foreach ($days as $day => $posts) {
@@ -328,8 +334,6 @@ class Archive
       });
     }
 
-    $this->ymd_archive = $archive_by_year;
-
     file_put_contents(
       $this->ymd_archive_file,
       json_encode($archive_by_year)
@@ -357,7 +361,7 @@ class Archive
 
     if (array_key_exists($year, $this->ymd_archive)) {
       $the_year = $this->ymd_archive[$year];
-      
+
       if ($month !== null) {
         if (array_key_exists($month, $the_year)) {
           $the_month = $the_year[$month];
@@ -384,23 +388,17 @@ class Archive
     }
   }
 
-  public function getMostRecentPosts(int $n = 5) : array {
+  public function getFlatArchive(): array
+  {
     if ($this->flat_archive === null) {
       throw new ArchiveException("Call loadFlatArchive() first.");
     }
 
-    return array_slice($this->flat_archive, 0, $n, true);
-  }
-
-  public function getFlatArchive() : array {
-    if ($this->flat_archive === null) {
-      throw new ArchiveException("Call loadFlatArchive() first.");
-    }
-    
     return $this->flat_archive;
   }
-  
-  public function getYmdArchive() : array {
+
+  public function getYmdArchive(): array
+  {
     if ($this->ymd_archive === null) {
       throw new ArchiveException("Call loadymdArchive() first.");
     }
