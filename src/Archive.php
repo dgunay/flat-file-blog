@@ -110,15 +110,7 @@ class Archive
 
     $archive = [];
     foreach ($post_files as $post_file) {
-      preg_match('/^\d+/', basename($post_file), $match);
-      if (isset($match[0])) {
-        $publish_date = $match[0];
-        $archive[$publish_date] = new Post($post_file);
-      } else {
-        throw new InvalidFileNameException(
-          "Failed to regex publish date from filename {$post_file}"
-        );
-      }
+      $archive[$publish_date] = PostFactory::fromFilename($post_file);
     }
 
     krsort($archive, SORT_NUMERIC);
