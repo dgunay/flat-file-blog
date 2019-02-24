@@ -135,7 +135,7 @@ class Archive
     krsort($archive, SORT_NUMERIC);
 
     file_put_contents(
-      $GLOBALS['blog_root'] . '/archive.json',
+      $this->flat_archive_file,
       json_encode($archive)
     );
   }
@@ -293,8 +293,6 @@ class Archive
    */
   function generateYmdArchive(): void
   {
-    throw new NotImplementedException("TODO: implement");
-
     if ($this->flat_archive === null) {
       throw new ArchiveException(
         "Call loadFlatArchive() before calling generateYmdArchive()."
@@ -331,6 +329,11 @@ class Archive
     }
 
     $this->ymd_archive = $archive_by_year;
+
+    file_put_contents(
+      $this->ymd_archive_file,
+      json_encode($archive_by_year)
+    );
   }
 
   /**
@@ -379,5 +382,29 @@ class Archive
     } else {
       throw new \OutOfBoundsException("No posts published in {$year}");
     }
+  }
+
+  public function getMostRecentPosts(int $n = 5) : array {
+    if ($this->flat_archive === null) {
+      throw new ArchiveException("Call loadFlatArchive() first.");
+    }
+
+    return array_slice($this->flat_archive, 0, $n, true);
+  }
+
+  public function getFlatArchive() : array {
+    if ($this->flat_archive === null) {
+      throw new ArchiveException("Call loadFlatArchive() first.");
+    }
+    
+    return $this->flat_archive;
+  }
+  
+  public function getYmdArchive() : array {
+    if ($this->ymd_archive === null) {
+      throw new ArchiveException("Call loadymdArchive() first.");
+    }
+
+    return $this->ymd_archive;
   }
 }
