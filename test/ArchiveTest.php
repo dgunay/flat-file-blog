@@ -211,13 +211,17 @@ final class ArchiveTest extends TestCase
 
     // Get everything from 2017
     $expected = $archive['2017'];
-    $this->assertEquals($expected, $this->archive->getPostsFrom(2017), 'Posts from 2017');
-    
-    // Get posts from 4/10/2018
-    $expected = $archive['2018']['10']['4'];
     $this->assertEquals(
       $expected, 
-      $this->archive->getPostsFrom(2017, 10, 4), 
+      $this->archive->getPostsFrom(2017), 
+      'Posts from 2017'
+    );
+    
+    // Get posts from 4/10/2018
+    $expected = $archive['2018']['4']['10'];
+    $this->assertEquals(
+      $expected, 
+      $this->archive->getPostsFrom(2018, 4, 10), 
       'Posts on 10/4/2018'
     );
 

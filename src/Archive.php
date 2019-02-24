@@ -277,8 +277,8 @@ class Archive
     foreach ($archive as $year => $months) {
       foreach ($months as $month => $days) {
         foreach ($days as $day => $posts) {
-          foreach ($posts as $post_params) {
-            $archive[$year][$month][$day] = PostFactory::fromParams($post_params);
+          foreach ($posts as $index => $post_params) {
+            $archive[$year][$month][$day][$index] = PostFactory::fromParams($post_params);
           }
         }
       }
@@ -354,7 +354,7 @@ class Archive
 
     if (array_key_exists($year, $this->ymd_archive)) {
       $the_year = $this->ymd_archive[$year];
-
+      
       if ($month !== null) {
         if (array_key_exists($month, $the_year)) {
           $the_month = $the_year[$month];
