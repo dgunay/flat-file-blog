@@ -104,13 +104,21 @@ class Archive
     $this->flat_archive = $archive;
   }
 
-  public function generateFlatArchive(): void
+  public function generateFlatArchive(array $post_files = null): void
   {
-    $post_files = glob($this->published_folder . '/*.md');
+    // glob() doesn't work with vfsStream, so we need to inject the post files
+    // for testing. Otherwise it will just look in the published folder.
+    if ($post_files === null) {
+      $post_files = glob($this->published_folder . '/*.md');
+    }
+    else { 
+      $post_files = $post_files;
+    }
 
     $archive = [];
     foreach ($post_files as $post_file) {
-      $archive[$publish_date] = PostFactory::fromFilename($post_file);
+      $post = PostFactory::fromFilename($post_file);
+      $archive[$post->getPublishTime()] = $post->array();
     }
 
     krsort($archive, SORT_NUMERIC);
@@ -300,31 +308,40 @@ class Archive
     $archive_by_year = [];
     foreach ($this->flat_archive as $publish_time => $post) {
       // construct datetime from Unix timestamp
-      $post_datetime = DateTime::createFromFormat(
+      $post_datetime = \DateTime::createFromFormat(
         'U', // unix timestamp
-        $publish_time,
-        new DateTimeZone('America/Los_Angeles')
+        (string) $publish_time,
+        new \DateTimeZone('America/Los_Angeles')
       );
 
-      // use year and month to sort posts into data structure ($archive)
+      // use year/month/day to sort posts into data structure ($archive)
       $year  = $post_datetime->format('Y');
-      $month = $post_datetime->format('m');
+      $month = $post_datetime->format('n'); // no leading zeroes.
+      $day   = $post_datetime->format('j'); // no leading zeroes.
 
-      $archive_by_year[$year][$month][] = $post;
+      $archive_by_year[$year][$month][$day][] = $post->array();
     }
 
-    // sort years descending
-    arsort($archive_by_year);
+    // // sort years descending
+    // asort($archive_by_year);
 
-    // sort months
-    foreach ($archive_by_year as $year => &$months) {
-      uksort($months, function ($a, $b) {
-        $month_a = date_parse($a)['month'];
-        $month_b = date_parse($b)['month'];
+    // // sort months
+    // foreach ($archive_by_year as $year => &$months) {
+    //   ksort($months);
+    //   // uksort($months, function ($a, $b) {
+    //   //   $month_a = date_parse($a)['month'];
+    //   //   $month_b = date_parse($b)['month'];
 
-        return $month_a - $month_b;
-      });
-    }
+    //   //   return $month_a - $month_b;
+    //   // });
+    // }
+
+    // // sort days
+    // foreach ($archive_by_year as $year => $months) {
+    //   foreach ($months as $month => &$days) {
+    //     asort($days);
+    //   }
+    // }
 
     file_put_contents(
       $this->ymd_archive_file,
@@ -392,7 +409,7 @@ class Archive
   public function getYmdArchive(): array
   {
     if ($this->ymd_archive === null) {
-      throw new ArchiveException("Call loadymdArchive() first.");
+      throw new ArchiveException("Call loadYmdArchive() first.");
     }
 
     return $this->ymd_archive;

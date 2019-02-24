@@ -6,6 +6,7 @@ use BlogBackend\Archive;
 use BlogBackend\PostFactory;
 use org\bovigo\vfs\vfsStream;
 use PHPUnit\Framework\TestCase;
+use org\bovigo\vfs\vfsStreamContent;
 
 final class ArchiveTest extends TestCase
 {
@@ -21,26 +22,11 @@ final class ArchiveTest extends TestCase
     $this->root  = vfsStream::setUp('home');
     $published   = vfsStream::newDirectory('published')->at($this->root);
 
-    // Copy our posts into them
-    vfsStream::copyFromFileSystem(
-      __DIR__ . '/Fixtures/virtual/published',
-      $published
-    );
-
     // Make a virtual 1D archive file and put our fixture in it as JSON
     vfsStream::newFile('flat_archive.json')->at($this->root);
-    file_put_contents(
-      vfsStream::url('home/flat_archive.json'),
-      json_encode($this->flatArchiveFixture())
-    );
-
 
     // Make a virtual YMD archive file and put our fixture in it as JSON
     vfsStream::newFile('ymd_archive.json')->at($this->root);
-    file_put_contents(
-      vfsStream::url('home/ymd_archive.json'),
-      json_encode($this->ymdArchiveFixture())
-    );
 
     // Give these virtual folders/files to the Archive
     $this->archive = new Archive(
@@ -48,30 +34,41 @@ final class ArchiveTest extends TestCase
       vfsStream::url('home/flat_archive.json'),
       vfsStream::url('home/ymd_archive.json')
     );
+    
+    // Virtualize our published posts
+    vfsStream::copyFromFileSystem(
+      __DIR__ . '/Fixtures/virtual/published',
+      $published
+    );
+
+    // Generate the archives.
+    $published_post_uris = array_map(function(vfsStreamContent $child) {
+      return $child->url();
+    }, $published->getChildren());
+    $this->archive->generateFlatArchive( $published_post_uris );
+    $this->archive->loadFlatArchive();
+    $this->archive->generateYmdArchive();
   }
 
   private function flatArchiveFixture(): array
   {
     return [
-      "1514618960" => [
+      '1514618960' => [
         "fileName" => vfsStream::url("home/published/1514618960_wow3.md"),
         "title" => "title",
         "tags" => ["#post"],
-        // "last_modified" => 1514618960,
         "publishTime" => 1514618960
       ],
-      "1514618983" => [
+      '1514618983' => [
         "fileName" => vfsStream::url("home/published/1514618983_wow2.md"),
         "title" => "title",
         "tags" => ["#post"],
-        // "last_modified" => 1514618983,
         "publishTime" => 1514618983
       ],
-      "1523335881" => [
+      '1523335881' => [
         "fileName"  => vfsStream::url("home/published/1523335881_wow.md"),
         "title" => "Smash 5 Wishlist",
-        "tags"  => ["#smash", "#nintendo", "#switch", "#gaming"],
-        // "last_modified" => 1523335881,
+        "tags"  => ["#BigChungus", "#memes"],
         "publishTime" => 1523335881
       ],
     ];
@@ -87,8 +84,7 @@ final class ArchiveTest extends TestCase
             [
               "fileName"  => vfsStream::url("home/published/1523335881_wow.md"),
               "title" => "Smash 5 Wishlist",
-              "tags"  => ["#smash", "#nintendo", "#switch", "#gaming"],
-              // "last_modified" => 1523335881,
+              "tags"  => ["#BigChungus", "#memes"],
               "publishTime" => 1523335881
             ],
           ]
@@ -101,14 +97,12 @@ final class ArchiveTest extends TestCase
               "fileName" => vfsStream::url("home/published/1514618983_wow2.md"),
               "title" => "title",
               "tags" => ["#post"],
-              // "last_modified" => 1514618983,
               "publishTime" => 1514618983
             ],
             [
               "fileName" => vfsStream::url("home/published/1514618960_wow3.md"),
               "title" => "title",
               "tags" => ["#post"],
-              // "last_modified" => 1514618960,
               "publishTime" => 1514618960
             ]
           ]
@@ -161,7 +155,7 @@ final class ArchiveTest extends TestCase
         ],
       ],
       'missing # tags' => [
-        ['smash'],
+        ['BigChungus'],
         [
           '1523335881' => $archive["1523335881"],
         ]
@@ -193,9 +187,9 @@ final class ArchiveTest extends TestCase
       "publishTime" => 100,
     ];
     $actual = [
-      "fileName" => $post->getFileName(),
-      'title' => $post->getTitle(),
-      'tags' => $post->getTags(),
+      "fileName"    => $post->getFileName(),
+      'title'       => $post->getTitle(),
+      'tags'        => $post->getTags(),
       "publishTime" => $post->getPublishTime(),
     ];
     $this->assertEquals($expected, $actual);

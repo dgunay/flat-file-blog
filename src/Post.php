@@ -72,6 +72,18 @@ class Post
     return file_get_contents($this->fileName);
   }
 
+  public function array(): array 
+  {
+    return [
+      'fileName'     => $this->fileName,
+      'title'        => $this->title,
+      'tags'         => $this->tags,
+      'lastModified' => $this->lastModified,
+      'publishTime'  => $this->publishTime,
+      'author'       => $this->author,
+    ];
+  }
+
   public function getFileName()     : string  { return $this->fileName;     }
   public function getTitle()        : string  { return $this->title;        }
   public function getTags()         : array   { return $this->tags;         }
