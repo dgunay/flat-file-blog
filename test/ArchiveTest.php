@@ -4,36 +4,28 @@ namespace BlogBackend\Test;
 
 use BlogBackend\Archive;
 use BlogBackend\PostFactory;
+
 use org\bovigo\vfs\vfsStream;
-use PHPUnit\Framework\TestCase;
 use org\bovigo\vfs\vfsStreamContent;
+use org\bovigo\vfs\vfsStreamDirectory;
+
+use PHPUnit\Framework\TestCase;
+use BlogBackend\Exception\PostNotFoundException;
 
 final class ArchiveTest extends TestCase
 {
   /** @var Archive $archive */
   private $archive;
 
-  /** @var org\bovigo\vfs\vfsStreamDirectory $root */
+  /** @var vfsStreamDirectory $root */
   private $root;
 
+  // Load our posts into memory
   public function setUp(): void
   {
     // set up the root of our virtual filesystem with two folders
-    $this->root  = vfsStream::setUp('home');
-    $published   = vfsStream::newDirectory('published')->at($this->root);
-
-    // Make a virtual 1D archive file and put our fixture in it as JSON
-    vfsStream::newFile('flat_archive.json')->at($this->root);
-
-    // Make a virtual YMD archive file and put our fixture in it as JSON
-    vfsStream::newFile('ymd_archive.json')->at($this->root);
-
-    // Give these virtual folders/files to the Archive
-    $this->archive = new Archive(
-      vfsStream::url('home/published'),
-      vfsStream::url('home/flat_archive.json'),
-      vfsStream::url('home/ymd_archive.json')
-    );
+    $this->root = vfsStream::setUp('home');
+    $published  = vfsStream::newDirectory('published')->at($this->root);
     
     // Virtualize our published posts
     vfsStream::copyFromFileSystem(
@@ -41,13 +33,16 @@ final class ArchiveTest extends TestCase
       $published
     );
 
-    // Generate the archives.
+    // Get the URIs to the published posts ourselves
     $published_post_uris = array_map(function(vfsStreamContent $child) {
       return $child->url();
     }, $published->getChildren());
-    $this->archive->generateFlatArchive( $published_post_uris );
-    $this->archive->loadFlatArchive();
-    $this->archive->generateYmdArchive();
+
+    // Inject the URIs manually to overcome limitation of vfs with glob().
+    $this->archive = new Archive( 
+      vfsStream::url('home/published'),
+      $published_post_uris
+    );
   }
 
   private function flatArchiveFixture(): array
@@ -94,17 +89,17 @@ final class ArchiveTest extends TestCase
         '12' => [
           '30' => [
             [
+              "fileName" => vfsStream::url("home/published/1514618960_wow3.md"),
+              "title" => "title",
+              "tags" => ["#post"],
+              "publishTime" => 1514618960
+            ],
+            [
               "fileName" => vfsStream::url("home/published/1514618983_wow2.md"),
               "title" => "title",
               "tags" => ["#post"],
               "publishTime" => 1514618983
             ],
-            [
-              "fileName" => vfsStream::url("home/published/1514618960_wow3.md"),
-              "title" => "title",
-              "tags" => ["#post"],
-              "publishTime" => 1514618960
-            ]
           ]
         ]
       ]
@@ -113,9 +108,6 @@ final class ArchiveTest extends TestCase
 
   public function testPostsByRange()
   {
-    // Load the archive in memory
-    $this->archive->loadFlatArchive();
-
     $expected = array_map(function (array $params) {
       return PostFactory::fromParams($params);
     }, array_slice($this->flatArchiveFixture(), 0, 2, true));
@@ -130,8 +122,6 @@ final class ArchiveTest extends TestCase
    */
   public function testPostsByTags(array $tags, array $expected)
   {
-    $this->archive->loadFlatArchive();
-
     // We have to map the array to Post here because dataProviders run before 
     // setUp().
     $expected = array_map(function (array $params) {
@@ -200,8 +190,6 @@ final class ArchiveTest extends TestCase
     // Map expected to Posts
     $archive = $this->mapYmdArchiveFixtureToPosts();
 
-    $this->archive->loadYmdArchive();
-
     // Get everything from 2017
     $expected = $archive['2017'];
     $this->assertEquals(
@@ -219,7 +207,7 @@ final class ArchiveTest extends TestCase
     );
 
     // Cache miss
-    $this->expectException(\OutOfBoundsException::class);
+    $this->expectException(PostNotFoundException::class);
     $this->archive->getPostsFrom(2019);
   }
 
