@@ -2,12 +2,13 @@
 
 namespace BlogBackend;
 
-use BlogBackend\Exception\NotImplementedException;
+use BlogBackend\Exception\FileNotFoundException;
+use BlogBackend\Exception\InvalidFileNameException;
 
 /**
  * Represents a post.
  */
-class Post
+class Post implements \JsonSerializable
 {
   /** @var string $fileName Path to the file */
   protected $fileName;
@@ -31,30 +32,67 @@ class Post
     string $fileName,
     string $title,
     array  $tags,
-    int    $publishTime,
     string $author = null
   ) {
-    // TODO: validation
+    if (!file_exists($fileName)) {
+      throw new FileNotFoundException("{$fileName} does not exist.");
+    }
+
     $this->fileName      = $fileName;
     $this->title         = $title;
     $this->tags          = $tags;
     $this->lastModified  = filemtime($fileName);
-    $this->publishTime   = $publishTime;
+    $this->publishTime   = Post::parsePublishTime($fileName);
     $this->author        = $author;
   }
 
-  public function markdown(): string
+  /**
+   * Parses publish time from the filename of a published post.
+   * 
+   * @throws InvalidFileNameException if the filename doesn't start with a unix 
+   *                                  timestamp
+   * @param string $filename
+   * @return int FIXME: use a datetime, this is silly
+   */
+  protected static function parsePublishTime(string $filename): int
   {
-    throw new NotImplementedException(
-      "TODO: chop off the header and return the markdown"
+    preg_match('/^(\d+)_/', basename($filename), $match);
+    if (isset($match[1])) {
+      $publish_time = $match[1];
+      return (int) $publish_time;
+    } 
+
+    throw new InvalidFileNameException(
+      "Failed to regex publish date from filename {$filename}"
     );
-    return '';
   }
 
-  public function getFileName()     : string  { return $this->fileName;      }
-  public function getTitle()        : string  { return $this->title;         }
-  public function getTags()         : array   { return $this->tags;          }
-  public function getLastModified() : int     { return $this->lastModified;  }
-  public function getPublishTime()  : int     { return $this->publishTime;   }
-  public function getAuthor()       : ?string { return $this->author;        }
+  public function text(): string
+  {
+    return file_get_contents($this->fileName);
+  }
+
+  public function array(): array 
+  {
+    return [
+      'fileName'     => $this->fileName,
+      'title'        => $this->title,
+      'tags'         => $this->tags,
+      'lastModified' => $this->lastModified,
+      'publishTime'  => $this->publishTime,
+      'author'       => $this->author,
+    ];
+  }
+
+  public function jsonSerialize()
+  {
+    return $this->array();
+  }
+
+  public function getFileName()     : string  { return $this->fileName;     }
+  public function getTitle()        : string  { return $this->title;        }
+  public function getTags()         : array   { return $this->tags;         }
+  public function getLastModified() : int     { return $this->lastModified; }
+  public function getPublishTime()  : int     { return $this->publishTime;  }
+  public function getAuthor()       : ?string { return $this->author;       }
 }

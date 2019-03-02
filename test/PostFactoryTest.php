@@ -8,7 +8,7 @@ use BlogBackend\PostFactory;
 final class PostFactoryTest extends TestCase
 {
   /**
-   * @dataProvider postTextProvider
+   * @dataProvider postProvider
    */
   public function testConstructPostFromFile(array $expected)
   {
@@ -19,7 +19,7 @@ final class PostFactoryTest extends TestCase
     $this->assertEquals($expected['publish_time'], $post->getPublishTime());
   }
 
-  public function postTextProvider() {
+  public function postProvider() {
     return [
       [
         [
@@ -40,8 +40,12 @@ final class PostFactoryTest extends TestCase
     ];
   }
 
-  public function testConstructPostFromParams()
+  /**
+   * @dataProvider postProvider
+   */
+  public function testConstructPostFromParams(array $params)
   {
-    $this->markTestIncomplete();
+    $post = PostFactory::fromParams($params);
+    $this->assertTrue(true);
   }
 }

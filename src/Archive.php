@@ -3,141 +3,72 @@
 namespace BlogBackend;
 
 use BlogBackend\Post;
-use BlogBackend\Exception\NotImplementedException;
-use BlogBackend\Exception\JsonDecodeException;
 use BlogBackend\Exception\FileNotFoundException;
-use BlogBackend\Exception\InvalidFileNameException;
 use BlogBackend\Exception\ArchiveException;
+use BlogBackend\Exception\PostNotFoundException;
 
 /**
- * Retrieves all posts stored on the filesystem, as well as serializes a JSON
- * archive of published posts for easier access.
+ * Retrieves all posts stored on the filesystem and stores them in an in-memory
+ * representation.
  */
 class Archive
 {
-  /** @var string? $file The file where the archive is stored flatly */
-  private $flat_archive_file;
-
-  /** @var string? $file The file where the archive is stored by year/month/day */
-  private $ymd_archive_file;
-
-  /** @var string $posts_folder Where posts are stored before being published */
-  private $posts_folder;
-
   /** @var string $published_folder Where published posts are stored */
-  private $published_folder;
+  protected $published_folder;
 
-  /** @var array? $flat_archive Posts in a 1d array sorted by publish time */
-  private $flat_archive = null;
+  /** @var array<int, Post> $flat_archive Posts in a 1d array sorted by publish time */
+  protected $flat_archive;
 
-  /** @var array? $ymd_archive Posts in a 3d array organized by year/month/day */
-  private $ymd_archive = null;
+  // * @var array<int, array<int, array<int, array<int, Post>>>> $ymd_archive Posts in a 3d 
+  /** 
+   * @var array<int, array<int, array<int, array<int, Post>>>>
+   * $ymd_archive Posts in a 3d array organized by year/month/day 
+   * */
+  protected $ymd_archive;
 
   // TODO: document once the API has settled
-  public function __construct(
-    string $posts_folder,
-    string $published_folder,
-    string $flat_archive_file = null,
-    string $ymd_archive_file  = null
-  ) {
-    // See if the folders exist
-    if (!file_exists($posts_folder)) {
-      throw new FileNotFoundException(
-        "Folder {$posts_folder} for unpublished posts doesn't exist"
-      );
-    }
-
+  public function __construct(string $published_folder, array $post_files = null)
+  {
+    // See if the folder exists
     if (!file_exists($published_folder)) {
       throw new FileNotFoundException(
         "Folder {$published_folder} for publishing posts doesn't exist"
       );
     }
 
-    // These are nullable and will just cause exceptions later if the user 
-    // hasn't set them
-    $this->flat_archive_file = $flat_archive_file;
-    $this->ymd_archive_file  = $ymd_archive_file;
-
-    $this->posts_folder      = $posts_folder;
     $this->published_folder  = $published_folder;
+    $this->flat_archive = $this->loadFlatArchive($post_files);
+    $this->ymd_archive  = $this->loadYmdArchive();
   }
 
   /**
-   * Gets the filename where the archive is or will be stored as a 1D JSON map. 
+   * Deserializes posts from the filesystem and into a flat archive. Will set
+   * $this->flat_archive as a side effect.
    *
-   * @return string
+   * @param string[] $post_files Array of files to override $this->published_folder.
+   * @return array<int, Post>
    */
-  public function getFlatArchiveFilename(): string
+  public function loadFlatArchive(array $post_files = null): array
   {
-    return $this->flat_archive_file;
-  }
-
-  /**
-   * Gets the filename where the archive is or will be stored as a nested JSON 
-   * map by year/month/day.
-   *
-   * @return string
-   */
-  public function getYmdArchiveFilename(): string
-  {
-    return $this->ymd_archive_file;
-  }
-
-  /**
-   * Loads metadata for all currently published posts into a 1D array sorted by 
-   * timestamp.
-   * 
-   * If the file doesn't exist, throws an exception.
-   *
-   * @throws ArchiveJsonDecodeException if there is an error decoding the archive.
-   * @throws FileNotFound               if the archive file doesn't exist yet.
-   * @return void
-   */
-  public function loadFlatArchive(): void
-  {
-    $file_contents = @file_get_contents($this->flat_archive_file);
-    if ($file_contents === false) {
-      throw new FileNotFoundException(
-        "File {$this->flat_archive_file} not found. Make sure to generate it first."
-      );
+    // glob() doesn't work with vfsStream, so we need to inject the post files
+    // for testing. Otherwise it will just look in the published folder.
+    if ($post_files === null) {
+      $post_files = glob($this->published_folder . '/*.md');
+    } else {
+      $post_files = $post_files;
     }
-
-    $archive = json_decode($file_contents, true);
-
-    foreach ($archive as $publish_time => $params) {
-      $archive[$publish_time] = PostFactory::fromParams($params);
-    }
-
-    if (json_last_error() !== JSON_ERROR_NONE) {
-      throw new JsonDecodeException(json_last_error_msg());
-    }
-
-    $this->flat_archive = $archive;
-  }
-
-  public function generateFlatArchive(): void
-  {
-    $post_files = glob($this->published_folder . '/*.md');
 
     $archive = [];
     foreach ($post_files as $post_file) {
-      preg_match('/^\d+/', basename($post_file), $match);
-      if (isset($match[0])) {
-        $publish_date = $match[0];
-        $archive[$publish_date] = new Post($post_file);
-      } else {
-        throw new InvalidFileNameException(
-          "Failed to regex publish date from filename {$post_file}"
-        );
-      }
+      $post = PostFactory::fromFilename($post_file);
+      $archive[$post->getPublishTime()] = $post;
     }
 
+    // sort it by timestamp
     krsort($archive, SORT_NUMERIC);
 
-    file_put_contents(
-      $GLOBALS['blog_root'] . '/archive.json',
-      json_encode($archive)
-    );
+    $this->flat_archive = $archive;
+    return $archive;
   }
 
   /**
@@ -150,19 +81,13 @@ class Archive
    */
   public function postsByRange(int $from_time, int $to_time): array
   {
-    if ($this->flat_archive === null) {
-      throw new \RuntimeException(
-        "Flat archive not loaded. Call loadFlatArchive() first."
-      );
-    }
-
     if ($from_time > $to_time) {
       throw new \RangeException('Bounds of get_posts_by_range() invalid.');
     }
 
     $posts_in_range = array_filter(
       $this->flat_archive,
-      function (Post $post) use ($from_time, $to_time) {
+      function (Post $post) use ($from_time, $to_time): bool {
         $post_time = $post->getPublishTime();
         return ($post_time >= $from_time && $post_time <= $to_time);
       }
@@ -171,14 +96,21 @@ class Archive
     return $posts_in_range;
   }
 
-  public function postsByTags(array $tags)
+  /**
+   * Returns posts with any overlap at all with the passed tags. Tags need not
+   * have '#' symbol prepended.
+   *
+   * @param string[] $tags
+   * @return array<int, Post>
+   */
+  public function postsByTags(array $tags): array
   {
     if (empty($tags)) {
       throw new \InvalidArgumentException('Array of tags must not be empty.');
     }
 
     // prepend # to tags if not already present.
-    array_walk($tags, function (string &$val) {
+    array_walk($tags, function (string &$val): void {
       if ($val[0] !== '#') {
         $val = '#' . $val;
       }
@@ -195,52 +127,16 @@ class Archive
   }
 
   /**
-   * Gets data for a single post.
-   * 
-   * Return form: array(
-   * 	'title' 				=> string, 
-   * 	'tags' 					=> string[], 
-   * 	'last_modified' => int, 
-   * 	...
-   * );
+   * Takes an unpublished post from a given filename and publishes it into the
+   * publishing folder.
    *
-   * @param string $path
+   * @throws ArchiveException if the post already exists or if it fails to copy 
+   *                          the post to its publish location.
+   * @param string $post_file Unpublished post markdown file.
+   * @param int    $time      If set, sets the publish time to this unix 
+   *                          timestamp. Otherwise it defaults to time().
    * @return Post
    */
-  function getPostData(string $path): Post
-  {
-    $fp_in = fopen($path, 'r');
-
-    $tags_line = fgets($fp_in);
-    // array_values() guarantees that the result is indexed, not associative.
-    $tags = array_values(array_filter(explode(' ', $tags_line), function ($val) {
-      return strpos($val, '#') !== false;
-    }));
-
-    $title = '';
-    while (($line = fgets($fp_in)) !== false) {
-      if (strpos($line, '#') === 0) {
-        $title = ltrim($line, '# ');
-        break;
-      }
-    }
-
-    preg_match('/^\d+/', basename($path), $match);
-    if (isset($match[0])) {
-      $publish_date = $match[0];
-    } else {
-      throw new Exception('Failed to regex publish date from file ' . $path);
-    }
-
-    return array(
-      'path'          => $path,
-      'title'         => $title,
-      'tags'          => $tags,
-      'last_modified' => filemtime($path),
-      'publish_date'  => $publish_date,
-    );
-  }
-
   public function publish(string $post_file, int $time = null): Post
   {
     $time = $time ?? time();
@@ -249,86 +145,148 @@ class Archive
 
     // Really shouldn't happen, but is technically possible.
     if (file_exists($destination)) {
-      throw new ArchiveException("Published post already exists at $destination");
+      throw new ArchiveException("Published post already exists at {$destination}");
     }
 
     // Attempt the copy and throw an exception if it fails
     if (!@copy($post_file, $destination)) {
-      throw new \RuntimeException(error_get_last());
+      $err = error_get_last();
+      throw new ArchiveException($err['msg'] ?? '');
     }
 
-    return PostFactory::fromFilename($destination);
-  }
-
-  public function loadYmdArchive() : void {
-    $file_contents = @file_get_contents($this->ymd_archive_file);
-    if ($file_contents === false) {
-      throw new FileNotFoundException(
-        "File {$this->ymd_archive_file} not found. Make sure to generate it first."
-      );
+    try {
+      return PostFactory::fromFilename($destination);
+    } catch (\Exception $e) {
+      // Clean up the copied file before rethrowing
+      unlink($destination);
+      throw $e;
     }
-
-    $archive = json_decode($file_contents, true);
-    if (json_last_error() !== JSON_ERROR_NONE) {
-      throw new JsonDecodeException(json_last_error_msg());
-    }
-
-    foreach ($archive as $year => $months) {
-      foreach ($months as $month => $days) {
-        foreach ($days as $day => $posts) {
-          foreach ($posts as $post_params) {
-            $archive[$year][$month][$day] = PostFactory::fromParams($post_params);
-          }
-        }
-      }
-    }
-
-    $this->ymd_archive = $archive;
   }
 
   /**
    * Collects the paths to all published posts into an associative array with 
    * posts filed away by year and month and then serializes it to JSON.
+   * 
+   * @return array<int, array<int, array<int, array<int, Post>>>>
    */
-  function generateYmdArchive(): void
+  public function loadYmdArchive(): array
   {
-    throw new NotImplementedException("TODO: implement");
-
-    if ($this->flat_archive === null) {
-      throw new ArchiveException(
-        "Call loadFlatArchive() before calling generateYmdArchive()."
-      );
-    }
-
-    $archive_by_year = [];
-    foreach ($this->flat_archive as $publish_time => $post) {
-      // construct datetime from Unix timestamp
-      $post_datetime = DateTime::createFromFormat(
-        'U', // unix timestamp
-        $publish_time,
-        new DateTimeZone('America/Los_Angeles')
-      );
-
-      // use year and month to sort posts into data structure ($archive)
-      $year  = $post_datetime->format('Y');
-      $month = $post_datetime->format('m');
-
-      $archive_by_year[$year][$month][] = $post;
-    }
-
-    // sort years descending
-    arsort($archive_by_year);
-
-    // sort months
-    foreach ($archive_by_year as $year => &$months) {
-      uksort($months, function ($a, $b) {
-        $month_a = date_parse($a)['month'];
-        $month_b = date_parse($b)['month'];
-
-        return $month_a - $month_b;
-      });
-    }
-
+    $archive_by_year = $this->constructYmdArchiveFromPosts($this->flat_archive);
     $this->ymd_archive = $archive_by_year;
+    return $archive_by_year;
+  }
+
+  /**
+   * Helper function for *YmdArchive() functions in this class and subclasses.
+   * 
+   * @param Post[] $posts
+   * @return array
+   */
+  protected function constructYmdArchiveFromPosts(array $posts): array
+  {
+    $archive_by_year = [];
+    foreach ($posts as $post) {
+      // construct datetime from Unix timestamp
+      $post_datetime = \DateTime::createFromFormat(
+        'U', // unix timestamp
+        (string)$post->getPublishTime(),
+        new \DateTimeZone('America/Los_Angeles')
+      );
+
+      if ($post_datetime === false) {
+        throw new ArchiveException(
+          "Failed to parse publish time '{$post->getPublishTime()}' for Post '{$post->getTitle()}'"
+        );
+      }
+
+      // use year/month/day to sort posts into data structure ($archive)
+      $year  = $post_datetime->format('Y');
+      $month = $post_datetime->format('n'); // no leading zeroes.
+      $day   = $post_datetime->format('j'); // no leading zeroes.
+
+      // Just in case
+      if (!$year || !$month || !$day) {
+        throw new \LogicException("DateTime::format() failed for year, month, or day.");
+      }
+
+      $archive_by_year[(int)$year][(int)$month][(int)$day][] = $post;
+    }
+
+    foreach ($archive_by_year as $year => $months) {
+      foreach ($months as $month => $days) {
+        foreach ($days as $day => &$posts) {
+          if (count($posts) > 1) {
+            usort($posts, function (Post $a, Post $b): int {
+              return $a->getPublishTime() <=> $b->getPublishTime();
+            });
+            $archive_by_year[$year][$month][$day] = $posts;
+          }
+        }
+      }
+    }
+
+    return $archive_by_year;
+  }
+
+  /**
+   * Gets posts from a given year/month/day. Month and day are optional. The
+   * resulting array is not flattened so you will have to do that yourself if
+   * you are retrieving by year/month and not day.
+   *
+   * @throws PostNotFoundException if there are no posts in the year/month/day.
+   * @param string|int $year
+   * @param string|int $month
+   * @param string|int $day
+   * @return array
+   */
+  public function getPostsFrom($year, $month = null, $day = null): array
+  {
+    if (array_key_exists($year, $this->ymd_archive)) {
+      $the_year = $this->ymd_archive[$year];
+
+      if ($month !== null) {
+        if (array_key_exists($month, $the_year)) {
+          $the_month = $the_year[$month];
+
+          if ($day !== null) {
+            if (array_key_exists($day, $the_month)) {
+              return $the_month[$day];
+            } else {
+              throw new PostNotFoundException(
+                "No posts published on {$year}/{$month}/{$day}"
+              );
+            }
+          }
+
+          return $the_month;
+        } else {
+          throw new PostNotFoundException("No posts published in {$year}/{$month}");
+        }
+      }
+
+      return $the_year;
+    } else {
+      throw new PostNotFoundException("No posts published in {$year}");
+    }
+  }
+
+  /**
+   * Gets the full underlying data structure of the flat Archive.
+   *
+   * @return array<int, Post>
+   */
+  public function getFlatArchive(): array
+  {
+    return $this->flat_archive;
+  }
+
+  /**
+   * Gets the full underlying data structure of the y/m/d Archive.
+   *
+   * @return array<int, array<int, array<int, array<int, Post>>>>
+   */
+  public function getYmdArchive(): array
+  {
+    return $this->ymd_archive;
   }
 }

@@ -4,76 +4,66 @@ namespace BlogBackend\Test;
 
 use BlogBackend\Archive;
 use BlogBackend\PostFactory;
+
 use org\bovigo\vfs\vfsStream;
+use org\bovigo\vfs\vfsStreamContent;
+use org\bovigo\vfs\vfsStreamDirectory;
+
 use PHPUnit\Framework\TestCase;
+use BlogBackend\Exception\PostNotFoundException;
 
 final class ArchiveTest extends TestCase
 {
   /** @var Archive $archive */
   private $archive;
 
-  /** @var org\bovigo\vfs\vfsStreamDirectory $root */
+  /** @var vfsStreamDirectory $root */
   private $root;
 
+  // Load our posts into memory
   public function setUp(): void
   {
     // set up the root of our virtual filesystem with two folders
-    $this->root  = vfsStream::setUp('home');
-    $published   = vfsStream::newDirectory('published')->at($this->root);
-    $unpublished = vfsStream::newDirectory('unpublished')->at($this->root);
+    $this->root = vfsStream::setUp('home');
+    $published  = vfsStream::newDirectory('published')->at($this->root);
 
-    // Copy our posts into them
+    // Virtualize our published posts
     vfsStream::copyFromFileSystem(
-      __DIR__ .'/Fixtures/virtual/published',
+      __DIR__ . '/Fixtures/virtual/published',
       $published
     );
 
-    // Make a virtual 1D archive file and put our fixture in it as JSON
-    vfsStream::newFile('flat_archive.json')->at($this->root);
-    file_put_contents(
-      vfsStream::url('home/flat_archive.json'),
-      json_encode($this->flatArchiveFixture())
-    );
+    // Get the URIs to the published posts ourselves
+    $published_post_uris = array_map(function (vfsStreamContent $child) {
+      return $child->url();
+    }, $published->getChildren());
 
-
-    // Make a virtual YMD archive file and put our fixture in it as JSON
-    vfsStream::newFile('ymd_archive.json')->at($this->root);
-    file_put_contents(
-      vfsStream::url('home/ymd_archive.json'),
-      json_encode($this->ymdArchiveFixture())
-    );
-
-    // Give these virtual folders/files to the Archive
+    // Inject the URIs manually to overcome limitation of vfs with glob().
     $this->archive = new Archive(
-      vfsStream::url('home/unpublished'),
       vfsStream::url('home/published'),
-      vfsStream::url('home/flat_archive.json'),
-      vfsStream::url('home/ymd_archive.json')
+      $published_post_uris
     );
   }
 
   private function flatArchiveFixture(): array
   {
     return [
-      "1514618960" => [
+      '1514618960' => [
         "fileName" => vfsStream::url("home/published/1514618960_wow3.md"),
         "title" => "title",
-        "tags" => [ "#post" ],
-        // "last_modified" => 1514618960,
+        "tags" => ["#post"],
         "publishTime" => 1514618960
       ],
-      "1514618983" => [
+      '1514618983' => [
         "fileName" => vfsStream::url("home/published/1514618983_wow2.md"),
         "title" => "title",
-        "tags" => [ "#post" ],
-        // "last_modified" => 1514618983,
+        "tags" => ["#post"],
         "publishTime" => 1514618983
       ],
-      "1523335881" => [
+      '1523335881' => [
         "fileName"  => vfsStream::url("home/published/1523335881_wow.md"),
         "title" => "Smash 5 Wishlist",
-        "tags"  => ["#smash", "#nintendo", "#switch", "#gaming"],
-        // "last_modified" => 1523335881,
+        "tags"  => ["#BigChungus", "#memes"],
         "publishTime" => 1523335881
       ],
     ];
@@ -89,8 +79,7 @@ final class ArchiveTest extends TestCase
             [
               "fileName"  => vfsStream::url("home/published/1523335881_wow.md"),
               "title" => "Smash 5 Wishlist",
-              "tags"  => ["#smash", "#nintendo", "#switch", "#gaming"],
-              // "last_modified" => 1523335881,
+              "tags"  => ["#BigChungus", "#memes"],
               "publishTime" => 1523335881
             ],
           ]
@@ -100,19 +89,17 @@ final class ArchiveTest extends TestCase
         '12' => [
           '30' => [
             [
-              "fileName" => vfsStream::url("home/published/1514618983_wow2.md"),
-              "title" => "title",
-              "tags" => [ "#post" ],
-              // "last_modified" => 1514618983,
-              "publishTime" => 1514618983
-            ],
-            [
               "fileName" => vfsStream::url("home/published/1514618960_wow3.md"),
               "title" => "title",
-              "tags" => [ "#post" ],
-              // "last_modified" => 1514618960,
+              "tags" => ["#post"],
               "publishTime" => 1514618960
-            ]
+            ],
+            [
+              "fileName" => vfsStream::url("home/published/1514618983_wow2.md"),
+              "title" => "title",
+              "tags" => ["#post"],
+              "publishTime" => 1514618983
+            ],
           ]
         ]
       ]
@@ -120,11 +107,8 @@ final class ArchiveTest extends TestCase
   }
 
   public function testPostsByRange()
-  {    
-    // Load the archive in memory
-    $this->archive->loadFlatArchive();
-    
-    $expected = array_map(function(array $params) {
+  {
+    $expected = array_map(function (array $params) {
       return PostFactory::fromParams($params);
     }, array_slice($this->flatArchiveFixture(), 0, 2, true));
 
@@ -138,20 +122,19 @@ final class ArchiveTest extends TestCase
    */
   public function testPostsByTags(array $tags, array $expected)
   {
-    $this->archive->loadFlatArchive();
-
     // We have to map the array to Post here because dataProviders run before 
     // setUp().
-    $expected = array_map(function(array $params) {
+    $expected = array_map(function (array $params) {
       return PostFactory::fromParams($params);
     }, $expected);
-    
+
     $posts = $this->archive->postsByTags($tags);
 
     $this->assertEquals($expected, $posts);
   }
 
-  public function tagsProvider() {
+  public function tagsProvider()
+  {
     $archive = $this->flatArchiveFixture();
     return [
       'Normal tags' => [
@@ -162,7 +145,7 @@ final class ArchiveTest extends TestCase
         ],
       ],
       'missing # tags' => [
-        ['smash'],
+        ['BigChungus'],
         [
           '1523335881' => $archive["1523335881"],
         ]
@@ -179,7 +162,7 @@ final class ArchiveTest extends TestCase
 
     // Publish it
     $post = $this->archive->publish(
-      vfsStream::url('home/unpublished/my_new_post.md'), 
+      vfsStream::url('home/unpublished/my_new_post.md'),
       100
     );
 
@@ -194,16 +177,53 @@ final class ArchiveTest extends TestCase
       "publishTime" => 100,
     ];
     $actual = [
-      "fileName" => $post->getFileName(),
-      'title' => $post->getTitle(),
-      'tags' => $post->getTags(),
+      "fileName"    => $post->getFileName(),
+      'title'       => $post->getTitle(),
+      'tags'        => $post->getTags(),
       "publishTime" => $post->getPublishTime(),
     ];
     $this->assertEquals($expected, $actual);
   }
 
-  public function testGetArchiveByYear()
+  public function testGetPostsFrom()
   {
-    $this->markTestIncomplete('testGetArchiveByYear not written yet.');
+    // Map expected to Posts
+    $archive = $this->mapYmdArchiveFixtureToPosts();
+
+    // Get everything from 2017
+    $expected = $archive['2017'];
+    $this->assertEquals(
+      $expected,
+      $this->archive->getPostsFrom(2017),
+      'Posts from 2017'
+    );
+
+    // Get posts from 4/10/2018
+    $expected = $archive['2018']['4']['10'];
+    $this->assertEquals(
+      $expected,
+      $this->archive->getPostsFrom(2018, 4, 10),
+      'Posts on 10/4/2018'
+    );
+
+    // Cache miss
+    $this->expectException(PostNotFoundException::class);
+    $this->archive->getPostsFrom(2019);
+  }
+
+  private function mapYmdArchiveFixtureToPosts(): array
+  {
+    $archive = $this->ymdArchiveFixture();
+    foreach ($archive as $year => $months) {
+      foreach ($months as $month => $days) {
+        foreach ($days as $day => $posts) {
+          foreach ($posts as $index => $post_params) {
+            $archive[$year][$month][$day][$index] = PostFactory::fromParams($post_params);
+          }
+        }
+      }
+    }
+
+    return $archive;
   }
 }
