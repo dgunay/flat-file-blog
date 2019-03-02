@@ -26,7 +26,7 @@ final class ArchiveTest extends TestCase
     // set up the root of our virtual filesystem with two folders
     $this->root = vfsStream::setUp('home');
     $published  = vfsStream::newDirectory('published')->at($this->root);
-    
+
     // Virtualize our published posts
     vfsStream::copyFromFileSystem(
       __DIR__ . '/Fixtures/virtual/published',
@@ -34,12 +34,12 @@ final class ArchiveTest extends TestCase
     );
 
     // Get the URIs to the published posts ourselves
-    $published_post_uris = array_map(function(vfsStreamContent $child) {
+    $published_post_uris = array_map(function (vfsStreamContent $child) {
       return $child->url();
     }, $published->getChildren());
 
     // Inject the URIs manually to overcome limitation of vfs with glob().
-    $this->archive = new Archive( 
+    $this->archive = new Archive(
       vfsStream::url('home/published'),
       $published_post_uris
     );

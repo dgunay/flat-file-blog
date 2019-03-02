@@ -2,11 +2,12 @@
 
 namespace BlogBackend;
 
-use BlogBackend\{Post, Archive};
+use BlogBackend \{Post, Archive
+};
 
-use BlogBackend\Exception\{
-  JsonDecodeException, 
-  FileNotFoundException, 
+use BlogBackend\Exception \{
+  JsonDecodeException,
+  FileNotFoundException,
   ArchiveException
 };
 
@@ -30,7 +31,7 @@ class PersistentArchive extends Archive
     array $post_files = null
   ) {
     parent::__construct($published_folder, $post_files);
-    
+
     // See if the files exist
     if (!file_exists($flat_archive_file)) {
       throw new FileNotFoundException(
@@ -81,13 +82,7 @@ class PersistentArchive extends Archive
    */
   public function loadFlatArchiveFromFile(): array
   {
-    $file_contents = @file_get_contents($this->flat_archive_file);
-    if ($file_contents === false) {
-      $err = error_get_last();
-      throw new \RuntimeException(
-        "Failed to load {$this->flat_archive_file}: {$err['message']}"
-      );
-    }
+    $file_contents = $this->slurpFile($this->flat_archive_file);
 
     $archive = json_decode($file_contents, true);
     if (json_last_error() !== JSON_ERROR_NONE) {
@@ -102,15 +97,21 @@ class PersistentArchive extends Archive
     return $archive;
   }
 
-  public function loadYmdArchiveFromFile(): array
+  private function slurpFile(string $filename): string
   {
-    $file_contents = @file_get_contents($this->ymd_archive_file);
+    $file_contents = @file_get_contents($filename);
     if ($file_contents === false) {
       $err = error_get_last();
-      throw new \RuntimeException(
-        "Failed to load {$this->ymd_archive_file}: {$err['message']}"
-      );
+      $msg = $err['message'] ?? '';
+      throw new \RuntimeException("Failed to load {$filename}: {$msg}");
     }
+
+    return $file_contents;
+  }
+
+  public function loadYmdArchiveFromFile(): array
+  {
+    $file_contents = $this->slurpFile($this->ymd_archive_file);
 
     $archive = json_decode($file_contents, true);
     if (json_last_error() !== JSON_ERROR_NONE) {
@@ -161,10 +162,10 @@ class PersistentArchive extends Archive
       $post_files = $post_files;
     }
 
-    $posts = array_map(function(string $filename) :Post { 
-      return PostFactory::fromFilename($filename); 
+    $posts = array_map(function (string $filename): Post {
+      return PostFactory::fromFilename($filename);
     }, $post_files);
-    
+
     $archive_by_year = $this->constructYmdArchiveFromPosts($posts);
     file_put_contents(
       $this->ymd_archive_file,

@@ -63,7 +63,7 @@ class Archive
       $post = PostFactory::fromFilename($post_file);
       $archive[$post->getPublishTime()] = $post;
     }
-    
+
     // sort it by timestamp
     krsort($archive, SORT_NUMERIC);
 
@@ -182,13 +182,14 @@ class Archive
    * @param Post[] $posts
    * @return array
    */
-  protected function constructYmdArchiveFromPosts(array $posts) : array {
+  protected function constructYmdArchiveFromPosts(array $posts): array
+  {
     $archive_by_year = [];
     foreach ($posts as $post) {
       // construct datetime from Unix timestamp
       $post_datetime = \DateTime::createFromFormat(
         'U', // unix timestamp
-        (string) $post->getPublishTime(),
+        (string)$post->getPublishTime(),
         new \DateTimeZone('America/Los_Angeles')
       );
 
@@ -208,14 +209,14 @@ class Archive
         throw new \LogicException("DateTime::format() failed for year, month, or day.");
       }
 
-      $archive_by_year[(int) $year][(int) $month][(int) $day][] = $post;
+      $archive_by_year[(int)$year][(int)$month][(int)$day][] = $post;
     }
 
     foreach ($archive_by_year as $year => $months) {
       foreach ($months as $month => $days) {
         foreach ($days as $day => &$posts) {
           if (count($posts) > 1) {
-            usort($posts, function(Post $a, Post $b) {
+            usort($posts, function (Post $a, Post $b): int {
               return $a->getPublishTime() <=> $b->getPublishTime();
             });
             $archive_by_year[$year][$month][$day] = $posts;
