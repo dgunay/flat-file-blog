@@ -4,4 +4,4 @@ namespace BlogBackend\Exception;
 
 use BlogBackend\Exception\ArchiveException;
 
-class FileNotFoundException extends ArchiveException { }
+class PostNotFoundException extends ArchiveException { }
