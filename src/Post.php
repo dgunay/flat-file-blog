@@ -8,7 +8,7 @@ use BlogBackend\Exception\InvalidFileNameException;
 /**
  * Represents a post.
  */
-class Post
+class Post implements \JsonSerializable
 {
   /** @var string $fileName Path to the file */
   protected $fileName;
@@ -52,7 +52,7 @@ class Post
    * @throws InvalidFileNameException if the filename doesn't start with a unix 
    *                                  timestamp
    * @param string $filename
-   * @return int
+   * @return int FIXME: use a datetime, this is silly
    */
   protected static function parsePublishTime(string $filename): int
   {
@@ -82,6 +82,11 @@ class Post
       'publishTime'  => $this->publishTime,
       'author'       => $this->author,
     ];
+  }
+
+  public function jsonSerialize()
+  {
+    return $this->array();
   }
 
   public function getFileName()     : string  { return $this->fileName;     }
