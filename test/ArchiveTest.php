@@ -165,6 +165,7 @@ final class ArchiveTest extends TestCase
       vfsStream::url('home/unpublished/my_new_post.md'),
       100
     );
+    
 
     // Did it get published?
     $this->assertTrue(file_exists(vfsStream::url('home/published/100_my_new_post.md')));
